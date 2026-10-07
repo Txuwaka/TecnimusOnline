@@ -1,0 +1,13 @@
+/* Surfaces are CSS, so buttons keep their appearance without remote textures. */
+.button,.tips-toggle,.signal-button,.signal-choice,.bet-controls button{appearance:none;-webkit-appearance:none;box-sizing:border-box;text-decoration:none;text-shadow:none;isolation:isolate;border:1px solid #75906c;border-bottom-width:3px;border-radius:9px;box-shadow:inset 0 1px 0 #ffffff25,0 3px 0 #081f1866;cursor:pointer;font-weight:700;line-height:1.2;-webkit-text-fill-color:currentColor}
+.button.primary{color:#203528;background-color:#e6be69;background-image:linear-gradient(#f0d18c,#d8ad59);border-color:#b38b3e;border-bottom-color:#806125}
+.button.secondary{color:#243f2d;background-color:#e7eddc;background-image:linear-gradient(#f2f5e9,#d4e1c8);border-color:#9db38d;border-bottom-color:#688258}
+.button.dramatic{color:#fff4e7;background-color:#7d3e4a;background-image:linear-gradient(#995164,#703743);border-color:#b57b86;border-bottom-color:#48222a}
+.tips-toggle{color:#fff0c9;background-color:#2b5140;background-image:linear-gradient(#37634e,#244635);border-color:#779269;border-bottom-color:#173628;display:inline-flex;align-items:center;justify-content:center}
+.signal-button,.signal-choice,.bet-controls button{color:#243f2d;background-color:#e7eddc;background-image:linear-gradient(#f2f5e9,#d4e1c8)}
+.button:hover:not(:disabled),.tips-toggle:hover:not(:disabled),.signal-choice:hover:not(:disabled){filter:brightness(1.08);transform:translateY(-1px)}
+.button:active:not(:disabled),.tips-toggle:active:not(:disabled),.signal-button:active:not(:disabled){transform:translateY(2px);box-shadow:inset 0 1px 2px #081f1833}
+.button:disabled,.tips-toggle:disabled,.signal-button:disabled,.signal-choice:disabled,.bet-controls button:disabled{opacity:1;cursor:not-allowed;filter:none;background-color:#b7c5ae;background-image:linear-gradient(#ccd5c5,#a8b89c);color:#364a31;border-color:#879779;box-shadow:inset 0 1px 0 #ffffff25}
+.card:disabled{opacity:1;filter:none;cursor:default;-webkit-text-fill-color:currentColor}
+.button:focus-visible,.tips-toggle:focus-visible,.signal-button:focus-visible,.signal-choice:focus-visible{outline:3px solid #ffdb82;outline-offset:4px}
+@media(prefers-reduced-motion:reduce){.button,.tips-toggle{transition:none;transform:none!important}}

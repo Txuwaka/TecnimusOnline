@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/png" href="favicon.png">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#122c28">
+  <title>TecniMus · Mus contra la máquina</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="mus-rules.js" defer></script>
+  <script src="mus.js" defer></script>
+  <script src="avatars.js" defer></script>
+  <script src="solo-avatars.js" defer></script>
+  <link rel="stylesheet" href="avatars.css">
+  <link rel="stylesheet" href="controls.css">
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand"><img class="brand-logo" src="assets/logo.png" alt="Logo TecniMus"><div><span class="eyebrow">LA TIMBA DE TECNIMUS</span><h1>TecniMus</h1></div></div>
+      <div class="scoreboard" aria-label="Marcador de la partida">
+        <div class="team"><span>Tu equipo</span><strong id="pts-nosotros">0</strong><small>de 40</small></div>
+        <span class="score-divider" aria-hidden="true">:</span>
+        <div class="team"><span>Rivales</span><strong id="pts-ellos">0</strong><small>de 40</small></div>
+      </div>
+      <div class="top-controls"><a class="tips-toggle" href="index.html">Mesa online</a><button type="button" class="tips-toggle" id="btn-consejos" aria-pressed="false" title="Mostrar consejos">Consejos OFF</button><button type="button" class="tips-toggle sound-toggle" id="btn-sonido" aria-pressed="true" title="Activar o desactivar sonidos">Sonido ON</button><button type="button" class="reset" id="btn-reiniciar" title="Empezar una partida nueva">↻ <span>Nueva partida</span></button></div>
+    </header>
+
+    <main>
+      <section class="table-section" aria-label="Mesa de mus">
+        <div class="table-topline"><span id="mano-indicador">MANO 1</span><span id="fase-indicador">MUS</span><span id="baraja-indicador">Baraja española · 40 cartas</span></div>
+        <div class="table-wrap">
+          <div class="table-felt" id="tapete"><div class="flight-layer" id="flight-layer" aria-hidden="true"></div><div class="discard-zone" id="discard-zone" hidden><span class="discard-stack" aria-hidden="true"></span><span id="discard-caption">AL MONTÓN</span></div>
+            <div class="player partner" id="jugador3"><div class="player-name"><span class="avatar">C</span><span>Compañero <small id="turno-j3"></small></span></div><div class="cards mini" id="cartas-j3"></div><span class="discard-count" id="descarte-j3" hidden></span><span class="banter" id="broma-j3" aria-hidden="true"></span></div>
+            <div class="player rival-left" id="jugador2"><div class="player-name"><span class="avatar rival-avatar">1</span><span>Rival 1 <small id="turno-j2"></small></span></div><div class="cards mini" id="cartas-j2"></div><span class="discard-count" id="descarte-j2" hidden></span><span class="banter" id="broma-j2" aria-hidden="true"></span></div>
+            <div class="table-logo" aria-hidden="true"></div><div class="table-center"><span id="centro-titulo">A repartir</span><span id="centro-subtitulo">Habla quien tenga el turno</span><span class="stake-chip" id="stake-chip" hidden></span><span class="turn-feed" id="turn-feed">La acción aparecerá aquí</span></div>
+            <div class="player rival-right" id="jugador4"><div class="player-name"><span class="avatar rival-avatar">2</span><span>Rival 2 <small id="turno-j4"></small></span></div><div class="cards mini" id="cartas-j4"></div><span class="discard-count" id="descarte-j4" hidden></span><span class="banter" id="broma-j4" aria-hidden="true"></span></div>
+            <div class="player human" id="jugador1"><div class="player-name"><span class="avatar human-avatar">T</span><span>Tú <small id="turno-j1"></small></span></div><div class="cards" id="cartas-j1"></div><span class="discard-count" id="descarte-j1" hidden></span><span class="banter" id="broma-j1" aria-hidden="true"></span></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="action-panel" aria-label="Acciones de juego">
+        <div class="action-copy"><span class="eyebrow" id="etapa">TU TURNO</span><h2 id="mensaje">Selecciona las cartas que quieras cambiar.</h2><p id="ayuda" class="tips-only">Para dar mus debes seleccionar al menos una carta para descartar, o puedes cortar para empezar los lances.</p><div class="hand-strength tips-only" id="fuerza-mano" aria-label="Lectura de tu mano"></div></div>
+        <div class="signal-toolbar"><button class="signal-button" id="btn-senas" type="button" aria-expanded="false" aria-controls="signal-menu">Señas</button><span id="signal-receipt" role="status" aria-live="polite"></span><span id="signal-inbox" role="status" aria-live="polite"></span><button type="button" class="signal-button" id="btn-sena-vista" hidden>Visto</button></div>
+        <div class="signal-menu" id="signal-menu" hidden><strong>Un gesto para tu socio</strong><div id="signal-options"></div></div>
+        <div class="actions">
+          <div class="bet-controls" id="bet-controls" hidden><label for="bet-amount" id="bet-amount-label">Piedras</label><input id="bet-amount" type="number" inputmode="numeric" min="2" step="1" value="2" aria-describedby="bet-error"><button type="button" data-bet="2">2</button><button type="button" data-bet="5">5</button><button type="button" data-bet="10">10</button><span id="bet-error" role="status"></span></div>
+          <div class="action-group" id="panel-mus"><button type="button" class="button primary" id="btn-mus" disabled>Dar mus <span id="cuenta-descartes">(0)</span></button><button type="button" class="button secondary" id="btn-cortar">Cortar mus</button></div>
+          <div class="action-group" id="panel-apuestas" hidden><button type="button" class="button secondary" id="btn-paso">Paso</button><button type="button" class="button primary" id="btn-envido">Envido · 2</button><button type="button" class="button dramatic" id="btn-ordago">Órdago</button></div>
+          <div class="action-group" id="panel-respuesta" hidden><button type="button" class="button primary" id="btn-quiero">Quiero</button><button type="button" class="button secondary" id="btn-envido-mas">Envido más · +2</button><button type="button" class="button dramatic" id="btn-ordago-respuesta">Órdago</button><button type="button" class="button secondary" id="btn-no-quiero">No quiero</button></div>
+          <div class="action-group" id="panel-resolver" hidden><button type="button" class="button primary" id="btn-resolver">Mostrar cartas y puntuar</button></div>
+          <div class="action-group" id="panel-siguiente" hidden><button type="button" class="button primary" id="btn-siguiente">Siguiente mano →</button></div>
+          <div class="action-group" id="panel-fin" hidden><button type="button" class="button primary" id="btn-nueva">Jugar otra partida</button></div>
+        </div>
+      </section>
+
+      <div class="below"><section class="round-summary" aria-labelledby="resumen-titulo"><h2 id="resumen-titulo">Resumen de la mano</h2><div id="resumen"><p class="empty">Aquí aparecerán los resultados al descubrir las cartas.</p></div></section><section class="rules" aria-labelledby="reglas-titulo"><h2 id="reglas-titulo">Cómo jugar</h2><p>Selecciona cartas y da mus para cambiarlas. Corta cuando quieras. Cada jugador habla individualmente en orden desde la mano. Ante un envido puedes querer, subir la cantidad que elijas, lanzar órdago o no querer.</p><p>Se juegan grande, chica, pares y juego (o punto si nadie tiene juego). En pares y juego sólo habla quien lleva ese lance; sólo intervienen quienes los llevan. Cada pareja decide por separado. En los empates gana quien esté más cerca de la mano. La mano y el turno avanzan a derechas. El primer equipo en llegar a 40 piedras gana.</p><p class="variant">Variante: 8 reyes y 8 ases (tres = rey; doses = as). El órdago querido decide la partida al mostrar las cartas.</p></section></div>
+      <div class="below extras"><section class="round-summary"><h2>La libreta de la mesa</h2><details><summary>Ver conversación de esta mano</summary><ol id="hand-history" class="hand-history"></ol></details></section><section class="rules"><h2>Tu rincón de la timba</h2><p id="local-stats"></p><label class="volume-label" for="sound-volume">Volumen <output id="volume-value">50%</output></label><input id="sound-volume" type="range" min="0" max="100" step="5" value="50" aria-label="Volumen de los efectos"><p class="small-print">Estadísticas guardadas sólo en este navegador.</p></section></div>
+    </main>
+    <footer>TECNI<span>MUS</span> · Beta Online 2 · Modo individual · Una partida, cuatro jugadores, cuarenta piedras.</footer>
+  </div>
+  <div class="sr-only" id="anuncio" role="status" aria-live="polite"></div>
+  
+
+</body>
+</html>
