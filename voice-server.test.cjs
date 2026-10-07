@@ -1,0 +1,41 @@
+const {test}=require('node:test');
+const assert=require('node:assert/strict');
+const {createServer}=require('../server/index.cjs');
+test('GitHub Pages: CORS, sesiones Bearer y voz privada entre participantes autorizados',async t=>{
+  const origin='https://txuwa.github.io',app=createServer({allowedOrigins:[origin],botDelay:999999,maxRequests:1000});
+  await new Promise(r=>app.server.listen(0,'127.0.0.1',r));t.after(()=>app.close());
+  const base='http://127.0.0.1:'+app.server.address().port;
+  async function request(token,path,data,site=origin){const res=await fetch(base+'/api/'+path,{method:data===undefined?'GET':'POST',headers:{Origin:site,...(token?{Authorization:'Bearer '+token}:{}),...(data===undefined?{}:{'Content-Type':'application/json'})},body:data===undefined?undefined:JSON.stringify(data)});return {status:res.status,headers:res.headers,value:await res.json()};}
+  const preflight=await fetch(base+'/api/create',{method:'OPTIONS',headers:{Origin:origin,'Access-Control-Request-Headers':'authorization,content-type'}});
+  assert.equal(preflight.status,204);assert.equal(preflight.headers.get('access-control-allow-origin'),origin);
+  assert.match(preflight.headers.get('access-control-allow-headers'),/Authorization/);
+  assert.equal((await request('', 'create',{name:'Txuwa',avatar:'novato'},'https://evil.invalid')).status,403);
+  const a=(await request('','create',{name:'Txuwa',avatar:'novato'})).value;
+  const b=(await request('','join',{name:'Borja',avatar:'tahur',code:a.code})).value;
+  const third=(await request('','join',{name:'Lola',avatar:'campeona',code:a.code})).value;
+  const outsider=(await request('','create',{name:'Otra mesa',avatar:'sereno'})).value;
+  assert.equal((await request(a.sessionToken,'state')).value.sessionToken,undefined);
+  assert.equal((await request('', 'voice-config')).status,401);
+  assert.equal((await request(a.sessionToken,'voice-mode',{enabled:true,muted:false})).status,400);
+  const streams=[];
+  async function connect(token){const ac=new AbortController();const res=await fetch(base+'/api/events',{headers:{Origin:origin,Authorization:'Bearer '+token},signal:ac.signal});const reader=res.body.getReader(),decoder=new TextDecoder();let buffer='';const s={ac,reader,async next(event='state'){for(;;){let end;while((end=buffer.indexOf('\n\n'))>=0){const block=buffer.slice(0,end);buffer=buffer.slice(end+2);const kind=block.match(/event: ([^\n]+)/)?.[1]||'state',raw=block.match(/data: ([^\n]+)/)?.[1];if(raw&&kind===event)return JSON.parse(raw);}const chunk=await reader.read();assert.equal(chunk.done,false);buffer+=decoder.decode(chunk.value,{stream:true});}}};streams.push(s);await s.next();return s;}
+  t.after(()=>streams.forEach(s=>s.ac.abort()));
+  const sa=await connect(a.sessionToken),sb=await connect(b.sessionToken);await connect(third.sessionToken);await connect(outsider.sessionToken);
+  assert.equal((await request(a.sessionToken,'voice-config')).value.iceServers[0].urls.length>0,true);
+  const av=(await request(a.sessionToken,'voice-mode',{enabled:true,muted:false})).value;
+  const bv=(await request(b.sessionToken,'voice-mode',{enabled:true,muted:false})).value;
+  await request(outsider.sessionToken,'voice-mode',{enabled:true,muted:false});
+  const generations={generation:av.players.find(p=>p?.id===a.you).voiceGeneration,targetGeneration:bv.players.find(p=>p?.id===b.you).voiceGeneration};
+  const message={to:b.you,...generations,from:third.you,description:{type:'offer',sdp:'v=0\r\n'}};
+  assert.equal((await request(a.sessionToken,'voice-signal',{...message,targetGeneration:0})).status,400);
+  assert.equal((await request(a.sessionToken,'voice-signal',{...message,to:third.you})).status,400);
+  assert.equal((await request(outsider.sessionToken,'voice-signal',message)).status,400);
+  assert.equal((await request(a.sessionToken,'voice-signal',message)).status,200);
+  const delivered=await sb.next('voice-signal');assert.equal(delivered.from,a.you);assert.equal(delivered.description.sdp,'v=0\r\n');
+  assert.equal(JSON.stringify(delivered).includes('sessionToken'),false);
+  await request(b.sessionToken,'voice-mode',{enabled:false,muted:true});
+  assert.equal((await request(a.sessionToken,'voice-signal',message)).status,400);
+  const own=app.sessions.get(a.sessionToken);sa.ac.abort();
+  for(let i=0;i<40&&own.stream;i++)await new Promise(r=>setTimeout(r,10));
+  assert.equal(own.voice.enabled,false);assert.equal(own.voice.muted,true);
+});
