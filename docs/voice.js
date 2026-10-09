@@ -2,7 +2,7 @@
 class TecniVoice {
   constructor({api,onstate,onchange,createPeer=config=>new RTCPeerConnection(config),getMedia=constraints=>navigator.mediaDevices.getUserMedia(constraints),makeAudio=()=>document.createElement('audio')}={}){
     this.api=api;this.onstate=onstate;this.onchange=onchange||(()=>{});this.createPeer=createPeer;this.getMedia=getMedia;this.makeAudio=makeAudio;
-    this.peers=new Map();this.stream=null;this.state=null;this.enabled=false;this.muted=false;this.deafened=false;this.busy=false;this.error='';this.epoch=0;this.suspended=false;
+    this.peers=new Map();this.mutedPeers=new Set();this.stream=null;this.state=null;this.enabled=false;this.muted=false;this.deafened=false;this.busy=false;this.error='';this.epoch=0;this.suspended=false;
     this.timer=setInterval(()=>this.expire(),1500);
   }
   async enable(){
@@ -27,9 +27,13 @@ class TecniVoice {
   }
   suspend(){if(this.enabled||this.busy){this.suspended=true;this.release();this.error='La voz se ha apagado al perder la conexión. Actívala de nuevo al volver.';this.onchange();}}
   async toggleMute(){if(!this.enabled||this.busy)return;this.muted=!this.muted;this.stream?.getAudioTracks().forEach(t=>t.enabled=!this.muted);this.onchange();try{const state=await this.api('voice-mode',{enabled:true,muted:this.muted});if(this.onstate)this.onstate(state);else this.update(state);}catch(e){this.error=e.message;this.onchange();}}
-  toggleListen(){this.deafened=!this.deafened;for(const p of this.peers.values())p.audio.muted=this.deafened;this.onchange();}
+  isPeerMuted(id){return this.mutedPeers.has(id);}
+  togglePeerMute(id){const player=this.state?.players.find(p=>p?.id===id);if(!player||player.bot||id===this.state.you)return;this.isPeerMuted(id)?this.mutedPeers.delete(id):this.mutedPeers.add(id);this.applyListen();this.onchange();}
+  applyListen(){for(const p of this.peers.values())p.audio.muted=this.deafened||this.isPeerMuted(p.id);}
+  toggleListen(){this.deafened=!this.deafened;this.applyListen();this.onchange();}
   async resumePlayback(){for(const p of this.peers.values()){try{await p.audio.play();p.blocked=false;}catch{p.blocked=true;}}this.onchange();}
   update(state){
+    if(this.state?.code!==state?.code){this.mutedPeers.clear();for(const [id] of this.peers)this.drop(id);}
     this.state=state;if(!this.enabled||!state)return;
     const own=state.players.find(p=>p?.id===state.you);if(!own?.voice)return;
     const wanted=state.players.filter(p=>p&&!p.bot&&p.id!==state.you&&p.connected&&p.voice);
@@ -38,7 +42,7 @@ class TecniVoice {
     this.onchange();
   }
   add(player,ownGeneration){
-    const pc=this.createPeer({iceServers:this.config.iceServers}),audio=this.makeAudio();audio.autoplay=true;audio.playsInline=true;audio.muted=this.deafened;
+    const pc=this.createPeer({iceServers:this.config.iceServers}),audio=this.makeAudio();audio.autoplay=true;audio.playsInline=true;audio.muted=this.deafened||this.isPeerMuted(player.id);
     const p={id:player.id,generation:player.voiceGeneration,ownGeneration,pc,audio,makingOffer:false,ignoreOffer:false,answerPending:false,polite:MusRules.ids.indexOf(this.state.you)>MusRules.ids.indexOf(player.id),candidates:[],chain:Promise.resolve(),status:'connecting',started:Date.now(),blocked:false,restarts:0};this.peers.set(player.id,p);
     const send=payload=>this.api('voice-signal',{to:p.id,generation:p.ownGeneration,targetGeneration:p.generation,...payload});
     p.send=send;

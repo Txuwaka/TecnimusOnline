@@ -4,6 +4,7 @@
   const phaseName={GRANDE:'Grande',CHICA:'Chica',PARES:'Pares',JUEGO:'Juego',PUNTO:'Punto'};
   const signalNames={reyes:'Dos reyes',ases:'Dos ases','medias-reyes':'Medias de reyes','medias-ases':'Medias de ases',medias:'Medias',duples:'Duples','31':'Treinta y una',juego:'Juego','30':'Treinta al punto','29':'Veintinueve',ciego:'Ciego'};
   let avatar='novato',state=null,stream=null,connected=false,busy=false,selected=new Set(),handKey='',amount=2,signalOpen=false,sound=true,audio=null,lastSoundKey='',serverReady=false,voice=null;
+  const voiceButtons=new Map();
   const query=new URLSearchParams(location.search);
   let serverUrl=window.TECNIMUS_CONFIG?.serverUrl||'';
   try{serverUrl=localStorage.getItem('tecnimus-server')||serverUrl;}catch{}
@@ -39,6 +40,22 @@
   $('leave').onclick=async()=>{if(state?.game&&!confirm('¿Salir de la mesa? Un bot ocupará tu asiento y no podrás recuperarlo.'))return;try{await voice?.disable();await api('leave',{});stream?.close();connection.clear();state=null;selected.clear();handKey='';connected=false;$('connection').textContent='Mesa disponible';render();}catch(e){$('room-error').textContent=e.message;}};
   function node(tag,text,cls){const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n;}
   function button(text,fn,cls='secondary',disabled=false){const b=node('button',text,'button '+cls);b.type='button';b.disabled=disabled||busy||!connected;b.onclick=fn;return b;}
+  function voiceIcon(microphone,silent){
+    const drawing=microphone?'<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M6 10v2a6 6 0 0 0 12 0v-2M12 18v3M9 21h6"/>':'<path d="M3 9h4l5-4v14l-5-4H3Z"/>'+(silent?'':'<path d="M16 8q4 4 0 8M19 5q7 7 0 14"/>');
+    return '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'+drawing+(silent?'<path d="M3 3l18 18"/>':'')+'</g></svg>';
+  }
+  function paintVoiceButton(b,id){
+    const p=state?.players.find(p=>p?.id===id),own=id===state?.you,localMuted=voice?.isPeerMuted(id)||false;
+    const off=!voice?.enabled||!p?.voice||!p?.connected||p?.bot,silent=own?!voice?.enabled||voice.muted:off||localMuted||voice.deafened||p.muted;
+    const label=own?voice?.enabled?voice.muted?'Activar mi micrófono':'Silenciar mi micrófono':'Activar mi voz':(localMuted?'Escuchar a ':'Silenciar a ')+(p?.name||'este jugador')+' para mí';
+    b.innerHTML=voiceIcon(own,silent);b.setAttribute('aria-label',label);b.setAttribute('aria-pressed',String(own?!!voice?.muted:localMuted));
+    b.title=own?label:p?.bot?'Bot sin chat de voz':!voice?.enabled?'Activa tu voz para escuchar a otros jugadores':!p?.voice?'Este jugador tiene la voz apagada':(p.muted?'Su micrófono está silenciado. ':voice.deafened?'Tu escucha general está silenciada. ':'')+label;
+    b.disabled=!connected||!!voice?.busy||!p||!!p.bot||(!own&&off);b.dataset.status=off?'off':silent?'muted':'active';
+  }
+  function voiceButton(id){const b=node('button',undefined,'player-voice-button');b.type='button';b.dataset.player=id;
+    b.onclick=()=>{if(b.disabled)return;if(id===state.you)return voice.enabled?voice.toggleMute():voice.enable();voice.togglePeerMute(id);};
+    voiceButtons.set(id,b);paintVoiceButton(b,id);return b;
+  }
   const pipPositions={1:[[50,50]],2:[[50,22],[50,78]],3:[[50,18],[50,50],[50,82]],4:[[22,18],[78,18],[22,82],[78,82]],5:[[22,18],[78,18],[50,50],[22,82],[78,82]],6:[[22,18],[78,18],[22,50],[78,50],[22,82],[78,82]],7:[[22,18],[78,18],[22,40],[78,40],[50,62],[22,82],[78,82]]};
   const suits={Oros:'oros',Copas:'copas',Espadas:'espadas',Bastos:'bastos'},figures={10:'sota.png',11:'caballo.png',12:'rey.jpg'};
   function image(src,cls){const img=node('img',undefined,cls);img.src=src;img.alt='';img.draggable=false;return img;}
@@ -57,14 +74,15 @@
     $('welcome').hidden=!!state;$('room').hidden=!state;renderVoice();if(!state)return;
     $('code').textContent=state.code;$('lobby').hidden=!!state.game;$('game').hidden=!state.game;
     if(state.game){renderGame();return;}
-    const roster=$('roster');roster.replaceChildren();
+    const roster=$('roster');roster.replaceChildren();voiceButtons.clear();
     for(const id of ['jugador1','jugador3','jugador4','jugador2']){
-      const p=state.players.find(p=>p?.id===id),c=node('div',undefined,'roster-card');const a=node('div');a.innerHTML=TecniAvatars.svg(p?.avatar||'sereno');c.append(a);
-      const label=node('div');label.append(node('strong',p?p.name+(id===state.you?' · tú':''):'Silla libre'),node('small',(R.sides[id]==='nosotros'?'Equipo A':'Equipo B')+' · '+(p?p.connected?'conectado':'conectando':'entrará un bot')));c.append(label);roster.append(c);
+      const p=state.players.find(p=>p?.id===id),c=node('div',undefined,'roster-card');const a=node('div',undefined,'avatar-audio');a.innerHTML=TecniAvatars.svg(p?.avatar||'sereno');if(p)a.append(voiceButton(id));c.append(a);
+      const label=node('div',undefined,'roster-identity');label.append(node('strong',p?p.name+(id===state.you?' · tú':''):'Silla libre'),node('small',(R.sides[id]==='nosotros'?'Equipo A':'Equipo B')+' · '+(p?p.connected?'conectado':'conectando':'entrará un bot')));c.append(label);roster.append(c);
     }
     $('start').disabled=state.host!==state.you||busy||!connected;$('host-note').textContent=state.host===state.you?'Cuando quieras, empezamos. Los sitios vacíos se completarán con bots.':'Esperando a que el anfitrión comience.';
   }
   function renderGame(){
+    voiceButtons.clear();
     const g=state.game,you=state.you,ownSide=R.sides[you],other=ownSide==='nosotros'?'ellos':'nosotros';
     $('ours').textContent=g.scores[ownSide];$('theirs').textContent=g.scores[other];$('hand-caption').textContent='MANO '+g.handNumber+' · '+playerName(g.mano);$('phase-caption').textContent=['mus','discard'].includes(g.stage)?g.stage==='mus'?'Mus':'Descartes':phaseName[g.phase]||'Resultados';
     $('center-title').textContent=g.stage==='finished'?(g.winningSide===ownSide?'¡Ganamos!':'Nos han pillado'):g.stage==='summary'?'Cartas vistas':g.stage==='discard'?'Al montón':g.stage==='mus'?'¿Hay mus?':phaseName[g.phase]||'';
@@ -75,10 +93,9 @@
       const name=node('div',undefined,'online-name'),a=node('span',undefined,'comic-avatar');const signal=(g.publicSignals||[]).find(s=>s.from===id&&Date.now()<=s.expires);
       a.innerHTML=TecniAvatars.svg(p.avatar,g.stage==='finished'?R.sides[id]===g.winningSide?'wink':'lose':TecniAvatars.mood(g.calls[id]),signal?.motion||'');
       const rival=R.sides[id]!==ownSide,catchable=rival&&signal&&!signal.caught;
-      const avatarButton=node('button',undefined,'detect-avatar'+(catchable?' is-catchable':''));avatarButton.type='button';avatarButton.setAttribute('aria-label',rival?'Detectar una seña de '+p.name:p.name);avatarButton.disabled=!rival||!connected||busy;avatarButton.dataset.motion=signal?.motion||'';avatarButton.append(a);
-      if(signal){const gestures={wink:'Guiño',brows:'Cejas',tongue:'Lengua',bite:'Labio','side-mouth':'Boca al lado','side-tongue':'Lengua al lado',kiss:'Labios',shrug:'Hombros','one-shoulder':'Un hombro',closed:'Ojos cerrados'};avatarButton.append(node('span',gestures[signal.motion]||'Gesto','gesture-label'));}
+      const avatarButton=node('button',undefined,'detect-avatar');avatarButton.type='button';avatarButton.setAttribute('aria-label',rival?'Detectar una seña de '+p.name:p.name);avatarButton.disabled=!rival||!connected||busy;avatarButton.dataset.motion=signal?.motion||'';avatarButton.append(a);
       avatarButton.onclick=()=>{if(!catchable||Date.now()>signal.expires){$('action-error').textContent='No has pillado ningún gesto. Mira el avatar cuando haga una seña.';return;}action('detect',{signalId:signal.id});};
-      const labels=node('div');labels.append(node('strong',id===you?p.name+' · tú':p.name));let tags=[];if(g.mano===id)tags.push('MANO');if(p.bot)tags.push('BOT');else if(!p.connected)tags.push('SIN CONEXIÓN');if(p.voice)tags.push(p.muted?'MIC SILENCIADO':'VOZ');if(g.declarations?.[id])tags.push(g.declarations[id].pairs?'PARES':'SIN PARES');if(g.declarations?.[id]?.game!==undefined)tags.push(g.declarations[id].game?'JUEGO':'SIN JUEGO');labels.append(node('small',tags.join(' · ')));name.append(avatarButton,labels);box.append(name,node('span',g.calls[id]||'','call'));
+      const labels=node('div',undefined,'player-labels');labels.append(node('strong',id===you?p.name+' · tú':p.name));let tags=[];if(g.mano===id)tags.push('MANO');if(p.bot)tags.push('BOT');else if(!p.connected)tags.push('SIN CONEXIÓN');if(p.voice)tags.push(p.muted?'MIC SILENCIADO':'VOZ');if(g.declarations?.[id])tags.push(g.declarations[id].pairs?'PARES':'SIN PARES');if(g.declarations?.[id]?.game!==undefined)tags.push(g.declarations[id].game?'JUEGO':'SIN JUEGO');labels.append(node('small',tags.join(' · ')));const avatarAudio=node('div',undefined,'avatar-audio');avatarAudio.append(avatarButton,voiceButton(id));name.append(avatarAudio,labels);box.append(name,node('span',g.calls[id]||'','call'));
       const cards=node('div',undefined,'cards');const hand=id===you?g.hand:g.hands?.[id]||[null,null,null,null];hand.forEach((c,i)=>cards.append(card(c,i,id===you,g)));box.append(cards);
     }
     $('turn-label').textContent=!connected?'RECUPERANDO CONEXIÓN':g.actor===you?'TU TURNO':g.actor?'TURNO DE '+playerName(g.actor).toUpperCase():'MANO RESUELTA';
@@ -113,9 +130,10 @@
   setInterval(clock,1000);
   let gestureKey='';setInterval(()=>{if(!state?.game)return;const key=(state.game.publicSignals||[]).filter(s=>Date.now()<=s.expires).map(s=>s.id).join(',');if(key!==gestureKey){gestureKey=key;renderGame();}},150);
   function renderVoice(){if(!voice)return;$('voice-enable').textContent=voice.busy?'Preparando voz…':voice.enabled?'Apagar voz':'Activar voz';$('voice-enable').disabled=voice.busy||!connected;
+    for(const [id,b] of voiceButtons)paintVoiceButton(b,id);
     $('voice-mute').hidden=$('voice-listen').hidden=!voice.enabled;$('voice-mute').disabled=voice.busy;$('voice-mute').textContent=voice.muted?'Activar micrófono':'Silenciar micrófono';$('voice-mute').setAttribute('aria-pressed',String(voice.muted));$('voice-listen').textContent=voice.deafened?'Activar escucha':'Silenciar escucha';$('voice-listen').setAttribute('aria-pressed',String(voice.deafened));
     const peers=[...voice.peers.values()];$('voice-play').hidden=!peers.some(p=>p.blocked);$('voice-status').textContent=voice.error||(!voice.enabled?'Voz apagada. El micrófono sólo se activa cuando tú lo pides.':voice.muted?'Micrófono silenciado.':peers.length?'Voz activada · '+peers.filter(p=>p.status==='connected').length+' de '+peers.length+' conexiones listas.':'Voz activada. Esperando a que otro jugador se conecte.');
-    const box=$('voice-peers');box.replaceChildren();for(const peer of peers)box.append(node('span',playerName(peer.id)+' · '+(peer.blocked?'pulsa Reproducir voces':peer.status==='connected'?'conectado':peer.status==='failed'?'sin conexión':'conectando'),'voice-peer is-'+peer.status));
+    const box=$('voice-peers');box.replaceChildren();for(const peer of peers)box.append(node('span',playerName(peer.id)+' · '+(voice.isPeerMuted(peer.id)?'silenciado para ti':peer.blocked?'pulsa Reproducir voces':peer.status==='connected'?'conectado':peer.status==='failed'?'sin conexión':'conectando'),'voice-peer is-'+peer.status));
   }
   voice=new TecniVoice({api,onstate:setState,onchange:renderVoice});
   $('voice-enable').onclick=()=>voice.enabled?voice.disable():voice.enable();$('voice-mute').onclick=()=>voice.toggleMute();$('voice-listen').onclick=()=>voice.toggleListen();$('voice-play').onclick=()=>voice.resumePlayback();
